@@ -1,15 +1,15 @@
-import {Command, Flags, ux} from '@oclif/core'
+import { Command, Flags, ux } from '@oclif/core'
 import * as inquirer from 'inquirer'
 import * as path from 'node:path'
 
 import * as customFlags from '../flags/common'
-import {DIRECTUS_PINK, DIRECTUS_PURPLE, SEPARATOR} from '../lib/constants'
-import {ApplyFlags, validateInteractiveFlags, validateProgrammaticFlags} from '../lib/load/apply-flags'
-import apply from '../lib/load/index.js'
-import {getDirectusToken, getDirectusUrl, initializeDirectusApi} from '../lib/utils/auth'
+import { DIRECTUS_PINK, DIRECTUS_PURPLE, SEPARATOR } from '../lib/constants'
+import { ApplyFlags, validateInteractiveFlags, validateProgrammaticFlags } from '../lib/load/apply-flags'
+import apply from '../lib/load/'
+import { getDirectusToken, getDirectusUrl, initializeDirectusApi } from '../lib/utils/auth'
 import catchError from '../lib/utils/catch-error'
-import {getCommunityTemplates, getGithubTemplate, getInteractiveLocalTemplate, getLocalTemplate} from '../lib/utils/get-template'
-import {logger} from '../lib/utils/logger'
+import { getCommunityTemplates, getGithubTemplate, getInteractiveLocalTemplate, getLocalTemplate } from '../lib/utils/get-template'
+import { logger } from '../lib/utils/logger'
 import openUrl from '../lib/utils/open-url'
 
 interface Template {
@@ -100,7 +100,7 @@ export default class ApplyCommand extends Command {
    * @returns {Promise<void>} - Returns nothing
    */
   public async run(): Promise<void> {
-    const {flags} = await this.parse(ApplyCommand)
+    const { flags } = await this.parse(ApplyCommand)
     const typedFlags = flags as unknown as ApplyFlags
 
     await (typedFlags.programmatic ? this.runProgrammatic(typedFlags) : this.runInteractive(typedFlags))
@@ -120,10 +120,10 @@ export default class ApplyCommand extends Command {
     const templateType = await inquirer.prompt([
       {
         choices: [
-          {name: 'Community templates', value: 'community'},
-          {name: 'From a local directory', value: 'local'},
-          {name: 'From a public GitHub repository', value: 'github'},
-          {name: 'Get premium templates', value: 'directus-plus'},
+          { name: 'Community templates', value: 'community' },
+          { name: 'From a local directory', value: 'local' },
+          { name: 'From a public GitHub repository', value: 'github' },
+          { name: 'Get premium templates', value: 'directus-plus' },
         ],
         message: 'What type of template would you like to apply?',
         name: 'templateType',
@@ -134,37 +134,37 @@ export default class ApplyCommand extends Command {
     let template: Template
 
     switch (templateType.templateType) {
-    case 'community': {
-      const templates = await getCommunityTemplates()
-      const {selectedTemplate} = await inquirer.prompt([
-        {
-          choices: templates.map(t => ({name: t.templateName, value: t})),
-          message: 'Select a template.',
-          name: 'selectedTemplate',
-          type: 'list',
-        },
-      ])
-      template = selectedTemplate
-      break
-    }
+      case 'community': {
+        const templates = await getCommunityTemplates()
+        const { selectedTemplate } = await inquirer.prompt([
+          {
+            choices: templates.map(t => ({ name: t.templateName, value: t })),
+            message: 'Select a template.',
+            name: 'selectedTemplate',
+            type: 'list',
+          },
+        ])
+        template = selectedTemplate
+        break
+      }
 
-    case 'local': {
-      const localTemplateDir = await ux.prompt('What is the local template directory?')
-      template = await this.selectLocalTemplate(localTemplateDir)
-      break
-    }
+      case 'local': {
+        const localTemplateDir = await ux.prompt('What is the local template directory?')
+        template = await this.selectLocalTemplate(localTemplateDir)
+        break
+      }
 
-    case 'github': {
-      const ghTemplateUrl = await ux.prompt('What is the public GitHub repository URL?')
-      template = await getGithubTemplate(ghTemplateUrl)
-      break
-    }
+      case 'github': {
+        const ghTemplateUrl = await ux.prompt('What is the public GitHub repository URL?')
+        template = await getGithubTemplate(ghTemplateUrl)
+        break
+      }
 
-    case 'directus-plus': {
-      openUrl('https://directus.io/plus?utm_source=directus-template-cli&utm_content=apply-command')
-      ux.log('Redirecting to Directus website.')
-      ux.exit(0)
-    }
+      case 'directus-plus': {
+        openUrl('https://directus.io/plus?utm_source=directus-template-cli&utm_content=apply-command')
+        ux.log('Redirecting to Directus website.')
+        ux.exit(0)
+      }
     }
 
     ux.log(`You selected ${ux.colorize(DIRECTUS_PINK, template.templateName)}`)
@@ -178,8 +178,8 @@ export default class ApplyCommand extends Command {
     const loginMethod = await inquirer.prompt([
       {
         choices: [
-          {name: 'Directus Access Token', value: 'token'},
-          {name: 'Email and Password', value: 'email'},
+          { name: 'Directus Access Token', value: 'token' },
+          { name: 'Email and Password', value: 'email' },
         ],
         default: 'token',
         message: 'How do you want to log in?',
@@ -223,27 +223,27 @@ export default class ApplyCommand extends Command {
     let template: Template
 
     switch (validatedFlags.templateType) {
-    case 'community': {
-      const templates = await getCommunityTemplates()
-      template = templates.find(t => t.templateName === validatedFlags.templateLocation) || templates[0]
-      break
-    }
+      case 'community': {
+        const templates = await getCommunityTemplates()
+        template = templates.find(t => t.templateName === validatedFlags.templateLocation) || templates[0]
+        break
+      }
 
-    case 'local': {
-      template = await getLocalTemplate(validatedFlags.templateLocation)
-      break
-    }
+      case 'local': {
+        template = await getLocalTemplate(validatedFlags.templateLocation)
+        break
+      }
 
-    case 'github': {
-      template = await getGithubTemplate(validatedFlags.templateLocation)
-      break
-    }
+      case 'github': {
+        template = await getGithubTemplate(validatedFlags.templateLocation)
+        break
+      }
 
-    default: {
-      catchError('Invalid template type. Please check your template type.', {
-        fatal: true,
-      })
-    }
+      default: {
+        catchError('Invalid template type. Please check your template type.', {
+          fatal: true,
+        })
+      }
     }
 
     await initializeDirectusApi(validatedFlags)
@@ -274,7 +274,7 @@ export default class ApplyCommand extends Command {
         return templates[0]
       }
 
-      const {selectedTemplate} = await inquirer.prompt([
+      const { selectedTemplate } = await inquirer.prompt([
         {
           choices: templates.map(t => ({
             name: `${t.templateName} (${path.basename(t.directoryPath)})`,

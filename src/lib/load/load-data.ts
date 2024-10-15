@@ -1,16 +1,16 @@
-import {createItems, readItems, updateItemsBatch, updateSingleton} from '@directus/sdk'
-import {ux} from '@oclif/core'
+import { createItems, readItems, updateItemsBatch, updateSingleton } from '@directus/sdk'
+import { ux } from '@oclif/core'
 import path from 'node:path'
 
-import {DIRECTUS_PINK} from '../constants'
-import {api} from '../sdk'
+import { DIRECTUS_PINK } from '../constants'
+import { api } from '../sdk'
 import catchError from '../utils/catch-error'
-import {chunkArray} from '../utils/chunk-array'
+import { chunkArray } from '../utils/chunk-array'
 import readFile from '../utils/read-file'
 
 const BATCH_SIZE = 50
 
-export default async function loadData(dir:string) {
+export default async function loadData(dir: string) {
   const collections = readFile('collections', dir)
   ux.action.start(ux.colorize(DIRECTUS_PINK, `Loading data for ${collections.length} collections`))
 
@@ -26,15 +26,22 @@ async function loadSkeletonRecords(dir: string) {
   const collections = readFile('collections', dir)
   const primaryKeyMap = await getCollectionPrimaryKeys(dir)
   const userCollections = collections
-  .filter(item => !item.collection.startsWith('directus_', 0))
-  .filter(item => item.schema !== null)
-  .filter(item => !item.meta.singleton)
+    .filter(item => !item.collection.startsWith('directus_', 0))
+    .filter(item => item.schema !== null)
+    .filter(item => !item.meta.singleton)
 
   await Promise.all(userCollections.map(async collection => {
     const name = collection.collection
     const primaryKeyField = getPrimaryKey(primaryKeyMap, name)
     const sourceDir = path.resolve(dir, 'content')
-    const data = readFile(name, sourceDir)
+
+    let data = []
+    try {
+      data = readFile(name, sourceDir)
+    } catch (error) {
+      return
+      console.log("Error loading data for collection", name, error);
+    }
 
     // Fetch existing primary keys
     const existingPrimaryKeys = await getExistingPrimaryKeys(name, primaryKeyField)
@@ -48,7 +55,7 @@ async function loadSkeletonRecords(dir: string) {
     }
 
     const batches = chunkArray(newData, BATCH_SIZE).map(batch =>
-      batch.map(entry => ({[primaryKeyField]: entry[primaryKeyField]})),
+      batch.map(entry => ({ [primaryKeyField]: entry[primaryKeyField] })),
     )
 
     await Promise.all(batches.map(batch => uploadBatch(name, batch, createItems)))
@@ -95,21 +102,33 @@ async function uploadBatch(collection: string, batch: any[], method: Function) {
   }
 }
 
-async function loadFullData(dir:string) {
+async function loadFullData(dir: string) {
   ux.action.status = 'Updating records with full data'
-  const collections = readFile('collections', dir)
+  let collections = []
+  try {
+    collections = readFile('collections', dir)
+  } catch (error) {
+    return
+    console.log("Error loading collections", error);
+  }
   const userCollections = collections
-  .filter(item => !item.collection.startsWith('directus_', 0))
-  .filter(item => item.schema !== null)
-  .filter(item => !item.meta.singleton)
+    .filter(item => !item.collection.startsWith('directus_', 0))
+    .filter(item => item.schema !== null)
+    .filter(item => !item.meta.singleton)
 
   await Promise.all(userCollections.map(async collection => {
     const name = collection.collection
     const sourceDir = path.resolve(dir, 'content')
-    const data = readFile(name, sourceDir)
+    let data = []
+    try {
+      data = readFile(name, sourceDir)
+    } catch (error) {
+      return
+      console.log("Error loading data for collection", name, error);
+    }
 
     const batches = chunkArray(data, BATCH_SIZE).map(batch =>
-      batch.map(({user_created, user_updated, ...cleanedRow}) => cleanedRow),
+      batch.map(({ user_created, user_updated, ...cleanedRow }) => cleanedRow),
     )
 
     await Promise.all(batches.map(batch => uploadBatch(name, batch, updateItemsBatch)))
@@ -118,19 +137,25 @@ async function loadFullData(dir:string) {
   ux.action.status = 'Updated records with full data'
 }
 
-async function loadSingletons(dir:string) {
+async function loadSingletons(dir: string) {
   ux.action.status = 'Loading data for singleton collections'
   const collections = readFile('collections', dir)
   const singletonCollections = collections
-  .filter(item => !item.collection.startsWith('directus_', 0))
-  .filter(item => item.meta.singleton)
+    .filter(item => !item.collection.startsWith('directus_', 0))
+    .filter(item => item.meta.singleton)
 
   await Promise.all(singletonCollections.map(async collection => {
     const name = collection.collection
     const sourceDir = path.resolve(dir, 'content')
-    const data = readFile(name, sourceDir)
+    let data = []
     try {
-      const {user_created, user_updated, ...cleanedData} = data as any
+      data = readFile(name, sourceDir)
+    } catch (error) {
+      return
+      console.log("Error loading data for collection", name, error);
+    }
+    try {
+      const { user_created, user_updated, ...cleanedData } = data as any
       // @ts-expect-error
       await api.client.request(updateSingleton(name, cleanedData))
     } catch (error) {

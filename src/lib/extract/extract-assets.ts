@@ -1,15 +1,40 @@
-import {readFiles} from '@directus/sdk'
-import {ux} from '@oclif/core'
+import { readFiles } from '@directus/sdk'
+import { ux } from '@oclif/core'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import {DIRECTUS_PINK} from '../constants'
-import {api} from '../sdk'
+import { DIRECTUS_PINK } from '../constants'
+import { api } from '../sdk'
 import catchError from '../utils/catch-error'
 
-async function getAssetList() {
-  return api.client.request(readFiles({limit: -1}))
+// async function getAssetList() {
+//   return api.client.request(readFiles({limit: -1}))
+// }
+
+export async function getAssetList() {
+  let response
+
+  console.log("SKIP_ASSET_FOLDERS", process.env.SKIP_ASSET_FOLDERS)
+
+  if (process.env.SKIP_ASSET_FOLDERS) {
+    response = await api.client.request(readFiles({
+      filter: {
+        folder: {
+          // @ts-expect-error TODO: fix this
+          name: {
+            _nin: process.env.SKIP_ASSET_FOLDERS.split(',')
+          }
+        }
+      },
+      limit: -1
+    }))
+    ux.log('Skipped extracting files form folders: ' + process.env.SKIP_ASSET_FOLDERS)
+  } else {
+    response = await api.client.request(readFiles({ limit: -1 }))
+  }
+  return response
 }
+
 
 async function downloadFile(file: any, dir: string) {
   const response: Response | string = await api.client.request(() => ({
@@ -31,7 +56,7 @@ export async function downloadAllFiles(dir: string) {
   try {
     const fullPath = path.join(dir, 'assets')
     if (path && !fs.existsSync(fullPath)) {
-      fs.mkdirSync(fullPath, {recursive: true})
+      fs.mkdirSync(fullPath, { recursive: true })
     }
 
     const fileList = await getAssetList()
